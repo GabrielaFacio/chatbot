@@ -154,12 +154,10 @@ class HybridSearchRetriever:
     def load_sql(self,sql):
         
         #Connect to the bd
-        connectionString =("DRIVER={ODBC Driver 18 for SQL Server};""SERVER=netecdb-1.czbotsckvb07.us-west-2.rds.amazonaws.com;" "DATABASE=netec_preprod_230929;""UID=netec_readtest;""PWD=R3ad55**N3teC+;""TrustServerCertificate=yes;")
         conn=pyodbc.connect(connectionString)
         cursor=conn.cursor()
 
         #Execute the provided SQL command
-        sql="SELECT clave,nombre, certificacion, disponible, tipo_curso_id, sesiones, pecio_lista, tecnologia_id, subcontratado, pre_requisitos, complejidad_id FROM cursos_habilitados WHERE disponible = 1 OR subcontratado = 1"
         cursor.execute(sql)      
         rows=cursor.fetchall() 
         
