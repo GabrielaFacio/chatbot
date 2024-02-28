@@ -197,8 +197,11 @@ class HybridSearchRetriever:
         # ---------------------------------------------------------------------
         # 1.) Retrieve relevant documents from Pinecone vector database
         # ---------------------------------------------------------------------
-        documents = self.retriever.get_relevant_documents(query=human_message.content)      
-        #documents=self.pinecone.vector_store.similarity_search(query=query)
+        documents = self.retriever.get_relevant_documents(query=human_message.content)
+        print("Documents retrieved from Pinecone: ")
+        for doc in documents:
+            print(doc.page_content)
+                  
         document_texts=[doc.page_content for doc in documents]
  
         leader = textwrap.dedent(

@@ -1,5 +1,4 @@
 from sentence_transformers import SentenceTransformer
-import pinecone
 from pinecone import Pinecone
 import openai
 import streamlit as st
@@ -13,11 +12,11 @@ index = pc.Index('rag')
 
 def find_match(input):
     input_em = model.encode(input).tolist()
-    result = index.query(top_k=2,vector=input_em,includeMetadata=True)  
-    #print(result['matches'][0]['metadata'])
-    return result['matches'][0]['metadata']['text'] +"\n"+result['matches'][1]['metadata']['text']
-    # context1 = result['matches'][0]['metadata'].get('tokens', 'Contexto no encontrado')
-    # context2 = result['matches'][1]['metadata'].get('tokens', 'Contexto no encontrado')
+    result = index.query(top_k=1,vector=input_em,includeMetadata=True)  
+    return result['matches'][0]['metadata']['context']
+    #return result['matches'][0]['metadata']['lc_id'] +"\n"+result['matches'][1]['metadata']['lc_id']
+    #context1 = result['matches'][0]['metadata'].get('context', 'Contexto no encontrado')
+    # context2 = result['matches'][1]['metadata'].get('context', 'Contexto no encontrado')
     
     # return context1 + "\n" + context2
 def query_refiner(conversation, query):
@@ -28,8 +27,6 @@ def query_refiner(conversation, query):
     {"role": "user", "content": "The user question is ..."}
   ],
     model="gpt-3.5-turbo",
-    #model="text-davinci-003",
-    #prompt=f"Given the following user query and conversation log, formulate a question that would be the most relevant to provide the user with an answer from a knowledge base.\n\nCONVERSATION LOG: \n{conversation}\n\nQuery: {query}\n\nRefined Query:",
     temperature=0.7,
     max_tokens=256,
     top_p=1,

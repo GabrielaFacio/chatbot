@@ -9,8 +9,6 @@ import json
 import logging
 import os
 import pyodbc
-from openai import OpenAI
-import numpy as np
 # pinecone integration
 import pinecone
 from pinecone import Pinecone,PodSpec
@@ -120,13 +118,14 @@ class PineconeIndex:
 
     @property
     def openai_embeddings(self) -> OpenAIEmbeddings:
+        if self._openai_embeddings is None:
         
-        """OpenAIEmbeddings lazy read-only property."""
-        self._openai_embeddings=OpenAIEmbeddings(
-            model="text-embedding-3-small",            
-            dimensions=384,
-            api_key=settings.openai_api_key.get_secret_value(),
-            organization=settings.openai_api_organization     
+        #"""OpenAIEmbeddings lazy read-only property."""
+            self._openai_embeddings=OpenAIEmbeddings(
+                model="text-embedding-3-small",            
+                dimensions=384,
+                api_key=settings.openai_api_key.get_secret_value(),
+                organization=settings.openai_api_organization     
             )
         # if self._openai_embeddings is None:
         #     # pylint: disable=no-member

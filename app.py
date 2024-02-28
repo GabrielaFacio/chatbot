@@ -12,10 +12,10 @@ import streamlit as st
 from streamlit_chat import message
 from utils import *
 
-st.subheader("Chatbot with Langchain, ChatGPT, Pinecone, and Streamlit")
+st.subheader("Netec Chatbot")
 
 if 'responses' not in st.session_state:
-    st.session_state['responses'] = ["How can I assist you?"]
+    st.session_state['responses'] = ["¿Cómo puedo ayudarte?"]
 
 if 'requests' not in st.session_state:
     st.session_state['requests'] = []
@@ -23,11 +23,10 @@ if 'requests' not in st.session_state:
 llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key="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")
 
 if 'buffer_memory' not in st.session_state:
-            st.session_state.buffer_memory=ConversationBufferWindowMemory(k=3,return_messages=True)
+            st.session_state.buffer_memory=ConversationBufferWindowMemory(k=5,return_messages=True)
 
 
-system_msg_template = SystemMessagePromptTemplate.from_template(template="""Answer the question as truthfully as possible using the provided context, 
-and if the answer is not contained within the text below, say 'I don't know'""")
+system_msg_template = SystemMessagePromptTemplate.from_template(template="""Responde a la pregunta de la manera más veraz posible utilizando el contexto proporcionado""")
 
 
 human_msg_template = HumanMessagePromptTemplate.from_template(template="{input}")
@@ -46,13 +45,13 @@ textcontainer = st.container()
 
 
 with textcontainer:
-    query = st.text_input("Query: ", key="input")
+    query = st.text_input("Pregunta: ", key="input")
     if query:
-        with st.spinner("typing..."):
+        with st.spinner("escribiendo..."):
             conversation_string = get_conversation_string()
             # st.code(conversation_string)
             refined_query = query_refiner(conversation_string, query)
-            st.subheader("Refined Query:")
+            st.subheader("Pregunta refinada:")
             st.write(refined_query)
             context = find_match(refined_query)
             # print(context)  
