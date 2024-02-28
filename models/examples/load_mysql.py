@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """Sales Support Model (hsr) Retrieval Augmented Generation (RAG)"""
-import argparse
 import os
 from dotenv import find_dotenv, load_dotenv
 from models.hybrid_search_retreiver import HybridSearchRetriever

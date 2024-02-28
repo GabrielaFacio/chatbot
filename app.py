@@ -1,4 +1,5 @@
-from langchain.chat_models import ChatOpenAI
+#from langchain.chat_models import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain.chains import ConversationChain
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain.prompts import (
@@ -11,15 +12,15 @@ import streamlit as st
 from streamlit_chat import message
 from utils import *
 
-st.subheader("Netec Chatbot")
+st.subheader("Chatbot with Langchain, ChatGPT, Pinecone, and Streamlit")
 
 if 'responses' not in st.session_state:
-    st.session_state['responses'] = ["¡Hola! ¿Cómo puedo ayudarte?"]
+    st.session_state['responses'] = ["How can I assist you?"]
 
 if 'requests' not in st.session_state:
     st.session_state['requests'] = []
 
-llm = ChatOpenAI(model_name="gpt-3.5-turbo-instruct", openai_api_key="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")
+llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key="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")
 
 if 'buffer_memory' not in st.session_state:
             st.session_state.buffer_memory=ConversationBufferWindowMemory(k=3,return_messages=True)
@@ -45,16 +46,16 @@ textcontainer = st.container()
 
 
 with textcontainer:
-    query = st.text_input("Tu pregunta: ", key="input")
+    query = st.text_input("Query: ", key="input")
     if query:
-        with st.spinner("Escribiendo..."):
+        with st.spinner("typing..."):
             conversation_string = get_conversation_string()
             # st.code(conversation_string)
             refined_query = query_refiner(conversation_string, query)
             st.subheader("Refined Query:")
             st.write(refined_query)
             context = find_match(refined_query)
-            print(context)  
+            # print(context)  
             response = conversation.predict(input=f"Context:\n {context} \n\n Query:\n{query}")
         st.session_state.requests.append(query)
         st.session_state.responses.append(response) 

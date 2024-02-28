@@ -9,14 +9,16 @@ import json
 import logging
 import os
 import pyodbc
-
-
+from openai import OpenAI
+import numpy as np
 # pinecone integration
 import pinecone
+from pinecone import Pinecone,PodSpec
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 
 from langchain.document_loaders import PyPDFLoader
-from langchain.embeddings import OpenAIEmbeddings
+#from langchain.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import Document
 from langchain.vectorstores.pinecone import Pinecone as LCPinecone
 
@@ -38,8 +40,7 @@ class TextSplitter:
         """Create documents"""
         documents = []
         for text in texts:
-            # Create a Document object with the text and metadata
-            #document = Document(page_content=text, metadata={"context": text})
+            # Create a Document object with the text and metadata            
             document = Document(page_content=text, metadata={"context":text})            
             documents.append(document)
         return documents
@@ -54,11 +55,14 @@ class PineconeIndex:
     _openai_embeddings: OpenAIEmbeddings = None
     _vector_store: LCPinecone = None
 
-    def __init__(self, index_name: str = None):
-        self.init()
-        self.index_name = index_name or settings.pinecone_index_name
-        logging.debug("PineconeIndex initialized with index_name: %s", self.index_name)
-        logging.debug(self.index_stats)
+
+    def __init__(self):
+        self._index=None
+        self._text_splitter = None
+        self._openai_embeddings = None
+        self._vector_store = None
+        self._pinecone=None
+        logging.debug("PineconeIndex initialized.")
            
         self.message_history=[]
     def add_to_history(self,message:BaseMessage):
@@ -66,25 +70,27 @@ class PineconeIndex:
     def get_history(self):
         return self.message_history
 
-    @property
-    def index_name(self) -> str:
-        """index name."""
-        return self._index_name
+    # @property
+    # def index_name(self) -> str:
+    #     """index name."""
+    #     return self._index_name
 
-    @index_name.setter
-    def index_name(self, value: str) -> None:
-        """Set index name."""
-        if self._index_name != value:
-            self.init()
-            self._index_name = value
-            self.init_index()
+    # @index_name.setter
+    # def index_name(self, value: str) -> None:
+    #     """Set index name."""
+    #     if self._index_name != value:
+    #         self.init()
+    #         self._index_name = value
+    #         self.init_index()
 
+    
     @property
     def index(self) -> pinecone.Index:
         """pinecone.Index lazy read-only property."""
         if self._index is None:
-            self.init_index()
-            self._index = pinecone.Index(index_name=self.index_name)
+            self._index=self.init_index()
+            # self.init_index()
+            # self._index = pinecone.Index(index_name=self.index_name)
         return self._index
 
     @property
@@ -93,18 +99,17 @@ class PineconeIndex:
         retval = self.index.describe_index_stats()
         return json.dumps(retval.to_dict(), indent=4)
 
-    @property
-    def initialized(self) -> bool:
-        """initialized read-only property."""
-        indexes = pinecone.manage.list_indexes()
-        return self.index_name in indexes
+    # @property
+    # def initialized(self) -> bool:
+    #     """initialized read-only property."""
+    #     pinecone_instance=Pinecone()
+    #     indexes = pinecone_instance.list_indexes()
+    #     return self.index_name in indexes
 
     @property
     def vector_store(self) -> LCPinecone:
         """Pinecone lazy read-only property."""
         if self._vector_store is None:
-            if not self.initialized:
-                self.init_index()
             self._vector_store = LCPinecone(
                 index=self.index,
                 embedding=self.openai_embeddings,
@@ -112,15 +117,24 @@ class PineconeIndex:
             )
         return self._vector_store
 
+
     @property
     def openai_embeddings(self) -> OpenAIEmbeddings:
+        
         """OpenAIEmbeddings lazy read-only property."""
-        if self._openai_embeddings is None:
-            # pylint: disable=no-member
-            self._openai_embeddings = OpenAIEmbeddings(
-                api_key=settings.openai_api_key.get_secret_value(),
-                organization=settings.openai_api_organization,
+        self._openai_embeddings=OpenAIEmbeddings(
+            model="text-embedding-3-small",            
+            dimensions=384,
+            api_key=settings.openai_api_key.get_secret_value(),
+            organization=settings.openai_api_organization     
             )
+        # if self._openai_embeddings is None:
+        #     # pylint: disable=no-member
+        #     self._openai_embeddings = OpenAIEmbeddings(
+        #         model = 'text-embedding-3-small',
+        #         api_key=settings.openai_api_key.get_secret_value(),
+        #         organization=settings.openai_api_organization                  
+        #     )
         return self._openai_embeddings
 
     @property
@@ -131,21 +145,27 @@ class PineconeIndex:
         return self._text_splitter
 
     def init_index(self):
-        """Verify that an index named self.index_name exists in Pinecone. If not, create it."""
-        indexes = pinecone.manage.list_indexes()
-        if self.index_name not in indexes:
-            logging.debug("Index does not exist.")
-            self.create()
-
-    def init(self):
-        """Initialize Pinecone."""
-        # pylint: disable=no-member
-        pinecone.init(api_key=settings.pinecone_api_key.get_secret_value(), environment=settings.pinecone_environment)
-        self._index = None
-        self._index_name = None
-        self._text_splitter = None
-        self._openai_embeddings = None
-        self._vector_store = None
+        if self._pinecone is None:
+            self._pinecone = Pinecone(api_key=settings.pinecone_api_key.get_secret_value())
+            #Obtener la lista de índices existentes
+            existing_indexes=self._pinecone.list_indexes()
+            #Verificar si el índice ya existe
+            if settings.pinecone_index_name in [index['name'] for index in existing_indexes]:
+                logging.debug(f"Index {settings.pinecone_index_name} already exists.")
+            else:        
+                logging.debug(f"Creating index {settings.pinecone_index_name} as it does not exist")
+                
+                self._pinecone.create_index(
+                    name=settings.pinecone_index_name,
+                    dimension=384,
+                    metric="dotproduct",
+                    spec=PodSpec(
+                    environment="gcp-starter"
+            )
+        )
+            self._index = self._pinecone.Index(settings.pinecone_index_name)
+        return self._index      
+        
 
     def delete(self):
         """Delete index."""
@@ -155,21 +175,7 @@ class PineconeIndex:
         print("Deleting index...")
         pinecone.delete_index(self.index_name)
 
-    def create(self):
-        """Create index."""
-        metadata_config = {
-            "indexed": [settings.pinecone_vectorstore_text_key, "lc_type"],
-            "context": ["lc_text"],
-        }
-        print("Creating index. This may take a few minutes...")
-
-        pinecone.create_index(
-            name=self.index_name,
-            dimension=settings.pinecone_dimensions,
-            metric=settings.pinecone_metric,
-            metadata_config=metadata_config,
-        )
-        print("Index created.")
+    
 
     def initialize(self):
         """Initialize index."""
@@ -223,13 +229,13 @@ class PineconeIndex:
         self.initialize()
         
         #Establecer conexión a la base de datos
-        connectionString =("DRIVER={};""SERVER=;" "DATABASE=;""UID=;""PWD=;""TrustServerCertificate=yes;")
+        connectionString =("DRIVER={ODBC Driver 18 for SQL Server};""SERVER=netecdb-1.czbotsckvb07.us-west-2.rds.amazonaws.com;" "DATABASE=netec_preprod_230929;""UID=netec_readtest;""PWD=R3ad55**N3teC+;""TrustServerCertificate=yes;")
         
         conn=pyodbc.connect(connectionString)
         cursor=conn.cursor()
 
         #ejecutar consulta SQL
-        sql="SELECT clave, nombre, certificacion, disponible, tipo_curso_id, sesiones, pecio_lista, tecnologia_id, subcontratado, pre_requisitos, complejidad_id FROM cursos_habilitados WHERE disponible = 1 OR subcontratado = 1"
+        sql="SELECT ch.clave,ch.nombre,ch.certificacion,ch.disponible,ch.sesiones,ch.pecio_lista,ch.subcontratado,ch.pre_requisitos,t.nombre AS tecnologia_id,c.nombre AS complejidad_id,tc.nombre AS tipo_curso_id FROM cursos_habilitados ch JOIN tecnologias t ON ch.tecnologia_id = t.id JOIN complejidades c ON ch.complejidad_id = c.id JOIN tipo_cursos tc ON ch.tipo_curso_id = tc.id WHERE ch.disponible = 1;"
         cursor.execute(sql)
         rows=cursor.fetchall()
         

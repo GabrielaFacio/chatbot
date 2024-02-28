@@ -19,12 +19,16 @@ codespell==2.2.6
 
 # production
 # ------------
+openai==1.12.0
 python-decouple==3.8
-langchain==0.0.351
+langchain==0.1.9
+langsmith==0.1.2
 langchainhub==0.1.14
-langchain-experimental==0.0.47
-openai==1.6.0
-pinecone-client==2.2.4
+langchain-experimental
+langchain-community
+langchain-openai==0.0.8
+langchain-core
+pinecone-client==3.0.0
 pinecone-text==0.7.1
 pydantic==2.5.2
 pydantic-settings==2.1.0
@@ -35,3 +39,5 @@ pyodbc==5.0.1
 dropbox==11.36.2
 bs4==0.0.1
 streamlit==1.31.1
+streamlit-chat==0.1.1
+sentence-transformers==2.3.1
