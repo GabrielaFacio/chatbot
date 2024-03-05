@@ -97,12 +97,6 @@ class PineconeIndex:
         retval = self.index.describe_index_stats()
         return json.dumps(retval.to_dict(), indent=4)
 
-    # @property
-    # def initialized(self) -> bool:
-    #     """initialized read-only property."""
-    #     pinecone_instance=Pinecone()
-    #     indexes = pinecone_instance.list_indexes()
-    #     return self.index_name in indexes
 
     @property
     def vector_store(self) -> LCPinecone:
@@ -121,19 +115,11 @@ class PineconeIndex:
         if self._openai_embeddings is None:
         
         #"""OpenAIEmbeddings lazy read-only property."""
-            self._openai_embeddings=OpenAIEmbeddings(
-                model="text-embedding-3-small",            
-                dimensions=384,
+            self._openai_embeddings=OpenAIEmbeddings(                
                 api_key=settings.openai_api_key.get_secret_value(),
                 organization=settings.openai_api_organization     
             )
-        # if self._openai_embeddings is None:
-        #     # pylint: disable=no-member
-        #     self._openai_embeddings = OpenAIEmbeddings(
-        #         model = 'text-embedding-3-small',
-        #         api_key=settings.openai_api_key.get_secret_value(),
-        #         organization=settings.openai_api_organization                  
-        #     )
+        
         return self._openai_embeddings
 
     @property
@@ -156,7 +142,7 @@ class PineconeIndex:
                 
                 self._pinecone.create_index(
                     name=settings.pinecone_index_name,
-                    dimension=384,
+                    dimension=1536,
                     metric="dotproduct",
                     spec=PodSpec(
                     environment="gcp-starter"
@@ -228,13 +214,12 @@ class PineconeIndex:
         self.initialize()
         
         #Establecer conexión a la base de datos
-        connectionString =("DRIVER={ODBC Driver 18 for SQL Server};""SERVER=netecdb-1.czbotsckvb07.us-west-2.rds.amazonaws.com;" "DATABASE=netec_preprod_230929;""UID=netec_readtest;""PWD=R3ad55**N3teC+;""TrustServerCertificate=yes;")
-        
+        connectionString = f"DRIVER={os.environ['DRIVER']};SERVER={os.environ['SERVER']};DATABASE={os.environ['DATABASE']};UID={os.environ['UID']};PWD={os.environ['PWD']};TrustServerCertificate=yes;"
         conn=pyodbc.connect(connectionString)
         cursor=conn.cursor()
 
         #ejecutar consulta SQL
-        sql="SELECT ch.clave,ch.nombre,ch.certificacion,ch.disponible,ch.sesiones,ch.pecio_lista,ch.subcontratado,ch.pre_requisitos,t.nombre AS tecnologia_id,c.nombre AS complejidad_id,tc.nombre AS tipo_curso_id FROM cursos_habilitados ch JOIN tecnologias t ON ch.tecnologia_id = t.id JOIN complejidades c ON ch.complejidad_id = c.id JOIN tipo_cursos tc ON ch.tipo_curso_id = tc.id WHERE ch.disponible = 1;"
+        sql="SELECT ch.clave,ch.nombre,ch.certificacion,ch.disponible,ch.sesiones,ch.pecio_lista,ch.subcontratado,ch.pre_requisitos,t.nombre AS tecnologia_id,c.nombre AS complejidad_id,tc.nombre AS tipo_curso_id, m.nombre AS nombre_moneda FROM cursos_habilitados ch JOIN tecnologias t ON ch.tecnologia_id = t.id JOIN complejidades c ON ch.complejidad_id = c.id JOIN tipo_cursos tc ON ch.tipo_curso_id = tc.id JOIN monedas m ON ch.moneda_id=m.id WHERE ch.disponible = 1;"
         cursor.execute(sql)
         rows=cursor.fetchall()
         

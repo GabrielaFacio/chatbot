@@ -1,69 +1,50 @@
-#from langchain.chat_models import ChatOpenAI
-from langchain_community.chat_models import ChatOpenAI
-from langchain.chains import ConversationChain
-from langchain.chains.conversation.memory import ConversationBufferWindowMemory
-from langchain.prompts import (
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-    ChatPromptTemplate,
-    MessagesPlaceholder
-)
 import streamlit as st
-from streamlit_chat import message
-from utils import *
+from models.hybrid_search_retreiver import HybridSearchRetriever
+from langchain.chains.conversation.memory import ConversationBufferWindowMemory
+from langchain.schema import HumanMessage
+from pathlib import Path
 
+path = Path(__file__).parent.resolve()
+hybrid_search_retriever = HybridSearchRetriever()
+st.set_page_config(page_title='Netec Bot', layout='wide')
 st.subheader("Netec Chatbot")
 
-if 'responses' not in st.session_state:
-    st.session_state['responses'] = ["¿Cómo puedo ayudarte?"]
+# Asegúrate de que los estados necesarios están inicializados
+if "generated" not in st.session_state:
+    st.session_state["generated"] = []
+if "past" not in st.session_state:
+    st.session_state["past"] = []
+if "input" not in st.session_state:
+    st.session_state["input"] = ""
+if "stored_session" not in st.session_state:
+    st.session_state["stored_session"] = []
+if "conversation_history" not in st.session_state:  # Historial de conversación
+    st.session_state["conversation_history"] = []
 
-if 'requests' not in st.session_state:
-    st.session_state['requests'] = []
+def handle_user_input(user_input):
+    human_message = HumanMessage(content=user_input)
+    
+    # Añade el mensaje del usuario al historial de conversación
+    st.session_state.conversation_history.append(human_message)
+    
+    # Genera una respuesta utilizando el historial de conversación
+    response_content = hybrid_search_retriever.rag(human_message, conversation_history=st.session_state.conversation_history)
+    return response_content
 
-llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key="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")
+def get_text():
+    input_text = st.text_input(":female-technologist: Tú:", st.session_state["input"], key="input",
+                               placeholder="¿En qué puedo ayudarte hoy?",
+                               label_visibility='visible')
+    return input_text
 
-if 'buffer_memory' not in st.session_state:
-            st.session_state.buffer_memory=ConversationBufferWindowMemory(k=5,return_messages=True)
+user_input = get_text()
+if user_input:
+    with st.spinner(":robot_face: escribiendo..."):
+        output = handle_user_input(user_input)
+    st.session_state.past.append(user_input)
+    st.session_state.generated.append(output)
+    
 
-
-system_msg_template = SystemMessagePromptTemplate.from_template(template="""Responde a la pregunta de la manera más veraz posible utilizando el contexto proporcionado""")
-
-
-human_msg_template = HumanMessagePromptTemplate.from_template(template="{input}")
-
-prompt_template = ChatPromptTemplate.from_messages([system_msg_template, MessagesPlaceholder(variable_name="history"), human_msg_template])
-
-conversation = ConversationChain(memory=st.session_state.buffer_memory, prompt=prompt_template, llm=llm, verbose=True)
-
-
-
-
-# container for chat history
-response_container = st.container()
-# container for text box
-textcontainer = st.container()
-
-
-with textcontainer:
-    query = st.text_input("Pregunta: ", key="input")
-    if query:
-        with st.spinner("escribiendo..."):
-            conversation_string = get_conversation_string()
-            # st.code(conversation_string)
-            refined_query = query_refiner(conversation_string, query)
-            st.subheader("Pregunta refinada:")
-            st.write(refined_query)
-            context = find_match(refined_query)
-            # print(context)  
-            response = conversation.predict(input=f"Context:\n {context} \n\n Query:\n{query}")
-        st.session_state.requests.append(query)
-        st.session_state.responses.append(response) 
-with response_container:
-    if st.session_state['responses']:
-
-        for i in range(len(st.session_state['responses'])):
-            message(st.session_state['responses'][i],key=str(i))
-            if i < len(st.session_state['requests']):
-                message(st.session_state["requests"][i], is_user=True,key=str(i)+ '_user')
-
-          
+    for i in range(len(st.session_state['generated']) - 1, -1, -1):
+        st.write(f"Tú: {st.session_state['past'][i]}")
+        st.write(f"Bot: {st.session_state['generated'][i]}")

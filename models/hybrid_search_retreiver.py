@@ -41,6 +41,7 @@ from pinecone_text.sparse import BM25Encoder  # pylint: disable=import-error
 # this project
 from models.conf import settings
 from models.pinecone import PineconeIndex
+import os
  
 class Document:
   def __init__(self,page_content,metadata=None):
@@ -144,12 +145,12 @@ class HybridSearchRetriever:
     def load_sql(self,sql):
        
         #Connect to the bd
-        connectionString =("DRIVER={ODBC Driver 18 for SQL Server};""SERVER=netecdb-1.czbotsckvb07.us-west-2.rds.amazonaws.com;" "DATABASE=netec_preprod_230929;""UID=netec_readtest;""PWD=R3ad55**N3teC+;""TrustServerCertificate=yes;")
+        connectionString = f"DRIVER={os.environ['DRIVER']};SERVER={os.environ['SERVER']};DATABASE={os.environ['DATABASE']};UID={os.environ['UID']};PWD={os.environ['PWD']};TrustServerCertificate=yes;"
         conn=pyodbc.connect(connectionString)
         cursor=conn.cursor()
  
         #Execute the provided SQL command
-        sql="SELECT ch.clave,ch.nombre,ch.certificacion,ch.disponible,ch.sesiones,ch.pecio_lista,ch.subcontratado,ch.pre_requisitos,t.nombre AS tecnologia_id,c.nombre AS complejidad_id,tc.nombre AS tipo_curso_id FROM cursos_habilitados ch JOIN tecnologias t ON ch.tecnologia_id = t.id JOIN complejidades c ON ch.complejidad_id = c.id JOIN tipo_cursos tc ON ch.tipo_curso_id = tc.id WHERE ch.disponible = 1;"
+        sql="SELECT ch.clave,ch.nombre,ch.certificacion,ch.disponible,ch.sesiones,ch.pecio_lista,ch.subcontratado,ch.pre_requisitos,t.nombre AS tecnologia_id,c.nombre AS complejidad_id,tc.nombre AS tipo_curso_id, m.nombre AS nombre_moneda FROM cursos_habilitados ch JOIN tecnologias t ON ch.tecnologia_id = t.id JOIN complejidades c ON ch.complejidad_id = c.id JOIN tipo_cursos tc ON ch.tipo_curso_id = tc.id JOIN monedas m ON ch.moneda_id=m.id WHERE ch.disponible = 1;"
         cursor.execute(sql)      
         rows=cursor.fetchall()
         self.datos_recuperados=[]
@@ -173,7 +174,7 @@ class HybridSearchRetriever:
            
        
  
-    def rag(self, human_message: Union[str, HumanMessage]):
+    def rag(self, human_message: Union[str, HumanMessage],conversation_history=None):
         """
         Retrieval Augmented Generation prompt.
         1. Retrieve human message prompt: Given a user input, relevant splits are retrieved
@@ -197,21 +198,30 @@ class HybridSearchRetriever:
         # ---------------------------------------------------------------------
         # 1.) Retrieve relevant documents from Pinecone vector database
         # ---------------------------------------------------------------------
-        documents = self.retriever.get_relevant_documents(query=human_message.content)
+        context= " ".join([msg.content for msg in conversation_history[-5:]])
+        enhanced_query= f"{context} {human_message.content}"
+        documents = self.retriever.get_relevant_documents(query=enhanced_query) #query=human_message.content
+
         print("Documents retrieved from Pinecone: ")
         for doc in documents:
             print(doc.page_content)
-                  
-        document_texts=[doc.page_content for doc in documents]
- 
+        
+        curso_claves = [next(iter(doc.metadata))]
+
+    # Construimos un texto que incluye todas las claves de los cursos relevantes
+        claves_text = ". ".join(f"La clave del curso es {clave}." for clave in curso_claves)
+
+   
+        document_texts=[doc.page_content for doc in documents] 
         leader = textwrap.dedent(
             """You are a helpful assistant.
+            You always include the key course of the course you are talking about in that moment.
             You can assume that all of the following is true.
             You should attempt to incorporate these facts
             into your responses:\n\n
         """
         )
-        system_message_content = f"{leader} {'. '.join(document_texts)}"
+        system_message_content = f"{leader}{claves_text} {'. '.join(document_texts)}"
         system_message = SystemMessage(content=system_message_content)   
  
         # ---------------------------------------------------------------------

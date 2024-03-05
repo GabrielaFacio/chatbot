@@ -2,7 +2,7 @@ from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone
 import openai
 import streamlit as st
-openai.api_key = "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"
+openai.api_key = "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"
 model = SentenceTransformer('all-MiniLM-L6-v2')
 #model=SentenceTransformer('sentence-transformers/distiluse-base-multilingual-cased')
 
@@ -12,13 +12,11 @@ index = pc.Index('rag')
 
 def find_match(input):
     input_em = model.encode(input).tolist()
-    result = index.query(top_k=1,vector=input_em,includeMetadata=True)  
-    return result['matches'][0]['metadata']['context']
-    #return result['matches'][0]['metadata']['lc_id'] +"\n"+result['matches'][1]['metadata']['lc_id']
-    #context1 = result['matches'][0]['metadata'].get('context', 'Contexto no encontrado')
-    # context2 = result['matches'][1]['metadata'].get('context', 'Contexto no encontrado')
+    result = index.query(top_k=2,vector=input_em,includeMetadata=True) 
+    print(result['matches'][0]['metadata']['lc_id']) 
+    print(result['matches'][1]['metadata']['lc_id'])     
+    return result['matches'][0]['metadata']['lc_id'] +"\n"+result['matches'][1]['metadata']['lc_id']
     
-    # return context1 + "\n" + context2
 def query_refiner(conversation, query):
     response = openai.chat.completions.create(
     messages=[
