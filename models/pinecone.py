@@ -125,7 +125,7 @@ class PineconeIndex:
                 model="text-embedding-3-small",            
                 dimensions=384,
                 api_key=settings.openai_api_key.get_secret_value(),
-                organization=settings.openai_api_organization     
+                organization=settings.openai_api_organization,     
             )
         # if self._openai_embeddings is None:
         #     # pylint: disable=no-member
