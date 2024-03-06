@@ -1,6 +1,6 @@
 import streamlit as st
 from models.hybrid_search_retreiver import HybridSearchRetriever
-from langchain.chains.conversation.memory import ConversationBufferWindowMemory
+#from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain.schema import HumanMessage
 from pathlib import Path
 
