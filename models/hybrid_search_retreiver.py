@@ -30,7 +30,8 @@ from langchain.chat_models import ChatOpenAI
 from langchain.globals import set_llm_cache
  
 # prompting and chat
-from langchain.llms.openai import OpenAI
+#from langchain.llms.openai import OpenAI
+from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
  
 # hybrid search capability
