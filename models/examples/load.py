@@ -8,6 +8,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RAG example")
     parser.add_argument("filepath", type=str, help="Location of PDF documents")
     args = parser.parse_args()
+    filepath
 
     hsr.load(filepath=args.filepath)
 

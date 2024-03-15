@@ -113,7 +113,7 @@ class PineconeIndex:
     @property
     def openai_embeddings(self) -> OpenAIEmbeddings:
         if self._openai_embeddings is None:
-        
+                   
         #"""OpenAIEmbeddings lazy read-only property."""
             self._openai_embeddings=OpenAIEmbeddings(                
                 api_key=settings.openai_api_key.get_secret_value(),

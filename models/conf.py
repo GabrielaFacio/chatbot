@@ -136,7 +136,7 @@ class Settings(BaseSettings):
             self._pinecone_api_key_source = "init argument"
         if "OPENAI_API_KEY" in os.environ:
             self._openai_api_key_source = "environment variable"
-        elif data.get("openai_api_key"):
+        elif data.get("OPENAI_API_KEY"):
             self._openai_api_key_source = "init argument"
         self._initialized = True
 

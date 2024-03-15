@@ -30,7 +30,9 @@ from langchain.chat_models import ChatOpenAI
 from langchain.globals import set_llm_cache
  
 # prompting and chat
+#from langchain.llms.openai import OpenAI
 from langchain.llms.openai import OpenAI
+
 from langchain.prompts import PromptTemplate
  
 # hybrid search capability
@@ -42,6 +44,7 @@ from pinecone_text.sparse import BM25Encoder  # pylint: disable=import-error
 from models.conf import settings
 from models.pinecone import PineconeIndex
 import os
+import dropbox
  
 class Document:
   def __init__(self,page_content,metadata=None):
@@ -58,12 +61,17 @@ class HybridSearchRetriever:
  
     def __init__(self):
         """Constructor"""
+        #conexión con dropbox
+        #self.connection=os.environ['ACCESS_TOKEN']
+        #self.dbx=dropbox.Dropbox(self.connection)
         set_llm_cache(InMemoryCache())
         self.message_history=[]
     def add_to_history(self,message:BaseMessage):
         self.message_history.append(message)
     def get_history(self):
-        return self.message_history   
+        return self.message_history  
+    
+     
        
     @property
     def pinecone(self) -> PineconeIndex:
@@ -131,10 +139,33 @@ class HybridSearchRetriever:
         retval = llm(prompt.format(concept=concept))
         return retval
  
-    def load(self, filepath: str):
+    # def load(self, filepath: str):
+    #     try:
+    #         #Obtener la lista de archivos PDF en la carpeta de Dropbox
+    #         response=self.dbx.files_list_folder(filepath)
+
+    #         #Iterar sobre los archivos PDF en la carpeta
+    #         for entry in response.entries:
+    #             if entry.name.endswith(".pdf"): #filtrar sólo PDF
+
+    #                 #descargar el contenido del archivo PDF
+    #                 _,res=self.dbx.files_download(entry.path_lower)
+    #                 pdf_content=res.content
+    #                 #procesar el contenido del PDF para generar embeddings
+    #                 embeddings=self.pinecone.pdf_loader(pdf_content)
+    #                 #se almacenan los embeddings en Pinecone
+    #                 self.pinecone.vector_store.add_documents(embeddings)
+
+    #                 #se imprime mensaje de confirmación
+    #                 print(f"Embeddings generados y almacenados de dropbox")
+        
+    #     except Exception as e:
+    #         print(f"Error: {e}")
        
-         # """Pdf loader."""
-        self.pinecone.pdf_loader(filepath=filepath)
+      
+
+
+
     def tokenize (self,text):
         if text is not None:
             return text.split()
@@ -150,7 +181,69 @@ class HybridSearchRetriever:
         cursor=conn.cursor()
  
         #Execute the provided SQL command
-        sql="SELECT ch.clave,ch.nombre,ch.certificacion,ch.disponible,ch.sesiones,ch.pecio_lista,ch.subcontratado,ch.pre_requisitos,t.nombre AS tecnologia_id,c.nombre AS complejidad_id,tc.nombre AS tipo_curso_id, m.nombre AS nombre_moneda FROM cursos_habilitados ch JOIN tecnologias t ON ch.tecnologia_id = t.id JOIN complejidades c ON ch.complejidad_id = c.id JOIN tipo_cursos tc ON ch.tipo_curso_id = tc.id JOIN monedas m ON ch.moneda_id=m.id WHERE ch.disponible = 1;"
+        sql="""SELECT 
+    ch.clave, 
+    ch.nombre, 
+    ch.certificacion, 
+    ch.disponible, 
+    ch.sesiones, 
+    ch.pecio_lista, 
+    ch.subcontratado, 
+    ch.pre_requisitos, 
+    t.nombre AS tecnologia_id, 
+    c.nombre AS complejidad_id, 
+    tc.nombre AS tipo_curso_id, 
+    m.nombre AS nombre_moneda,
+    ce.nombre AS estatus_curso
+FROM 
+    cursos_habilitados ch 
+JOIN 
+    tecnologias t ON ch.tecnologia_id = t.id 
+JOIN 
+    complejidades c ON ch.complejidad_id = c.id 
+JOIN 
+    tipo_cursos tc ON ch.tipo_curso_id = tc.id 
+JOIN 
+    monedas m ON ch.moneda_id = m.id
+JOIN
+    cursos_estatus ce ON ch.curso_estatus_id = ce.id
+WHERE 
+    ch.disponible = 1 
+    AND (ce.nombre = 'Es Rentable' OR ce.nombre = 'Liberado')
+    AND tc.nombre IN ('intensivo', 'programa', 'digital')
+UNION ALL
+-- Consulta para cursos subcontratados
+SELECT 
+    ch.clave, 
+    ch.nombre, 
+    ch.certificacion, 
+    ch.disponible, 
+    ch.sesiones, 
+    ch.pecio_lista, 
+    ch.subcontratado, 
+    ch.pre_requisitos, 
+    t.nombre AS tecnologia_id, 
+    c.nombre AS complejidad_id, 
+    tc.nombre AS tipo_curso_id, 
+    m.nombre AS nombre_moneda,
+    ce.nombre AS estatus_curso
+FROM 
+    cursos_habilitados ch 
+JOIN 
+    tecnologias t ON ch.tecnologia_id = t.id 
+JOIN 
+    complejidades c ON ch.complejidad_id = c.id 
+JOIN 
+    tipo_cursos tc ON ch.tipo_curso_id = tc.id 
+JOIN 
+    monedas m ON ch.moneda_id = m.id
+JOIN
+    cursos_estatus ce ON ch.curso_estatus_id = ce.id
+WHERE 
+    ch.subcontratado = 1 
+    AND tc.nombre IN ('Intensivo', 'Digital','Programa')
+    AND (ce.nombre = 'Es Rentable' OR ce.nombre = 'Liberado');"""
+        
         cursor.execute(sql)      
         rows=cursor.fetchall()
         self.datos_recuperados=[]
@@ -200,22 +293,25 @@ class HybridSearchRetriever:
         # ---------------------------------------------------------------------
         context= " ".join([msg.content for msg in conversation_history[-5:]])
         enhanced_query= f"{context} {human_message.content}"
-        documents = self.retriever.get_relevant_documents(query=enhanced_query) #query=human_message.content
+        documents = self.retriever.get_relevant_documents(query=enhanced_query) 
 
+        #2.)Constructing a response including all related information
+       
         print("Documents retrieved from Pinecone: ")
         for doc in documents:
             print(doc.page_content)
         
-        curso_claves = [next(iter(doc.metadata))]
-
-    # Construimos un texto que incluye todas las claves de los cursos relevantes
-        claves_text = ". ".join(f"La clave del curso es {clave}." for clave in curso_claves)
-
-   
+        #Construyendo una respuesta incluyendo toda la información relacionada
+        curso_claves = [doc.metadata.get('lc_id') for doc in documents]      
+        #curso_claves = [next(iter(doc.metadata))]    
+        claves_text = ". ".join(f"La clave del curso es: {clave}." for clave in curso_claves)
         document_texts=[doc.page_content for doc in documents] 
         leader = textwrap.dedent(
             """You are a helpful assistant.
-            You always include the key course of the course you are talking about in that moment.
+            You always include the clave of the course you are talking about in that moment.
+            Enlist all the information related to the courses and ordenate them by complexity.
+            Enlist courses giving the following bullets:complejidad, duration, price and requirements.
+            Yoy must show all related courses from the first answer.
             You can assume that all of the following is true.
             You should attempt to incorporate these facts
             into your responses:\n\n
